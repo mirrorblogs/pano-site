@@ -1,6 +1,7 @@
+
 {
   "type": "equirectangular",
-  "panorama": "../../../images/park-360.jpg",
+  "panorama": "/pano-site/park-360.jpg",
   "autoLoad": true,
   "showControls": true,
   "title": "My Panorama",
