@@ -1,1 +1,10 @@
-
+{
+  "type": "equirectangular",
+  "panorama": "../../../images/park-360.jpg",
+  "autoLoad": true,
+  "showControls": true,
+  "title": "My Panorama",
+  "pitch": 0,
+  "yaw": 0,
+  "hfov": 100
+}
