@@ -1,7 +1,7 @@
 
 {
   "type": "equirectangular",
-  "panorama": "https://mirrorblogs.github.io/pano-site/park-360.jpg",
+  "panorama": "https://mirrorblogs.github.io/pano-site/enm/ena/pannellum.json",
   "autoLoad": true,
   "showControls": true,
   "title": "My Panorama",
