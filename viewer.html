@@ -4,96 +4,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Panorama Viewer</title>
+  <title>My Pannellum Viewer</title>
 
   <link rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.css">
-
-  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.7/build/pannellum.js"></script>
+    href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
 
   <style>
-    html, body {
+    html, body, #panorama {
+      width: 100%;
+      height: 100%;
       margin: 0;
-      width: 100%;
-      height: 100%;
       background: #111;
-      font-family: Arial, sans-serif;
     }
-    #panorama {
-      width: 100%;
-      height: 100%;
-    }
-    #message {
-      color: white;
-      padding: 20px;
+
+    #status {
+      position: fixed;
+      z-index: 10;
+      top: 12px;
+      left: 12px;
+      padding: 8px 12px;
+      background: white;
+      color: black;
+      font: 14px Arial, sans-serif;
     }
   </style>
 </head>
 <body>
+  <div id="status">Loading configuration...</div>
   <div id="panorama"></div>
-  <div id="message">Loading panorama...</div>
+
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
 
   <script>
-    async function startViewer() {
-      const message = document.getElementById("message");
-      const params = new URLSearchParams(location.search);
-      const configPath = params.get("config");
+    (async function () {
+      const status = document.getElementById("status");
+
+      // Read the complete query string.
+      const query = location.search;
+
+      // Support the normal format:
+      // ?config=configs/park.json&video=park-360
+      let configPath = new URLSearchParams(query).get("config");
+      let videoId = new URLSearchParams(query).get("video");
+
+      // Also support the special trailing format:
+      // ?config=configs/park.json?video-park-360
+      if (query.includes("?video-")) {
+        const marker = query.lastIndexOf("?video-");
+        videoId = query.slice(marker + 7);
+      }
+
+      // Default configuration.
+      if (!configPath) {
+        configPath = "configs/park.json";
+      }
+
+      // This demo only loads JSON files hosted in this repository.
+      // Accept a relative path or this site's absolute URL.
+      let configURL;
 
       try {
-        if (!configPath) {
-          throw new Error("URL-এ config দেওয়া হয়নি।");
+        configURL = new URL(
+          decodeURIComponent(configPath),
+          location.href
+        );
+
+        const allowedOrigin = location.origin;
+        const allowedPrefix = new URL(
+          "/pano-site/",
+          allowedOrigin
+        ).pathname;
+
+        if (
+          configURL.origin !== allowedOrigin ||
+          !configURL.pathname.startsWith(allowedPrefix) ||
+          !configURL.pathname.endsWith(".json")
+        ) {
+          throw new Error("Config must be a JSON file in this GitHub Pages site.");
         }
 
-        const configURL = new URL(configPath, location.href);
-
-        if (configURL.origin !== location.origin) {
-          throw new Error("Config অবশ্যই নিজের ওয়েবসাইটে থাকতে হবে।");
-        }
+        status.textContent = "Loading panorama...";
 
         const response = await fetch(configURL);
 
         if (!response.ok) {
-          throw new Error("Config ফাইল পাওয়া যায়নি।");
+          throw new Error("Config HTTP error: " + response.status);
         }
 
         const config = await response.json();
 
-        function fixImagePath(scene) {
-          if (
-            scene.panorama &&
-            !/^(https?:|data:|blob:)/i.test(scene.panorama)
-          ) {
-            scene.panorama = new URL(
-              scene.panorama, configURL
-            ).href;
-          }
+        // The video ID is a label here, not a video URL.
+        if (videoId) {
+          config.title = (config.title || "Panorama") +
+            " — " + videoId;
         }
 
-        if (config.scenes) {
-          Object.values(config.scenes).forEach(fixImagePath);
-        } else {
-          fixImagePath(config);
-        }
-
-        const selectedScene = params.get("scene");
-
-        if (
-          selectedScene &&
-          config.scenes &&
-          config.scenes[selectedScene]
-        ) {
-          config.default = selectedScene;
-        }
-
-        message.style.display = "none";
         pannellum.viewer("panorama", config);
 
-      } catch (error) {
-        message.textContent = "Error: " + error.message;
-      }
-    }
+        status.textContent = videoId
+          ? "Content ID: " + videoId
+          : "Panorama loaded";
 
-    startViewer();
+      } catch (error) {
+        status.textContent = "Error: " + error.message;
+        console.error(error);
+      }
+    })();
   </script>
 </body>
 </html>
