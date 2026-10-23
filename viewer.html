@@ -4,10 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>My Pannellum Viewer</title>
-
-  <link rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
-
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css">
   <style>
     html, body, #panorama {
       width: 100%;
@@ -15,7 +12,6 @@
       margin: 0;
       background: #111;
     }
-
     #status {
       position: fixed;
       z-index: 10;
@@ -33,58 +29,63 @@
 <body>
   <div id="status">Loading configuration...</div>
   <div id="panorama"></div>
-
   <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
-
   <script>
     (async function () {
       const status = document.getElementById("status");
       const params = new URLSearchParams(location.search);
       const query = location.search;
-
       let configPath = params.get("config");
       let videoId = params.get("video");
 
-      // Support: ?config=configs/park.json?video-park-360
+      // Support ?config=path/to/file.json?video-park-360
       if (query.includes("?video-")) {
-        const marker = query.lastIndexOf("?video-");
-        videoId = query.slice(marker + 7);
+        videoId = query.slice(query.lastIndexOf("?video-") + 7);
       }
 
-      if (!configPath) {
-        configPath = "configs/park.json";
-      }
+      if (!configPath) configPath = "configs/park.json";
 
       let configURL;
-
       try {
-        // URLSearchParams has already decoded percent-encoding once.
-        // Support the special form:
+        // URLSearchParams decodes percent escapes once. Also tolerate an
+        // extra encoded layer without repeatedly decoding arbitrary strings.
+        if (/%[0-9a-f]{2}/i.test(configPath)) {
+          try { configPath = decodeURIComponent(configPath); } catch (_) {}
+        }
+
+        // Special form in the request:
         // ?config=/%5C%2Fmirrorblogs.github.io%2Fenm%2Fena%2Fpannellum.json
-        // which decodes to: /\/mirrorblogs.github.io/enm/ena/pannellum.json
-        if (configPath.startsWith("/\\/")) {
-          configPath = configPath.slice(3);
-        }
+        // Its decoded path may look like: /\/mirrorblogs.github.io/enm/ena/pannellum.json
+        configPath = configPath.replace(/^\/\\\/+/, "");
+        configPath = configPath.replace(/^\\\/+/, "");
 
-        // Convert the special host/path form to this GitHub Pages site's
-        // actual repository path.
+        // If the host name is embedded in the config path, map it to this
+        // repository's GitHub Pages path.
         if (configPath.startsWith("mirrorblogs.github.io/")) {
-          configPath = "/pano-site/" +
-            configPath.slice("mirrorblogs.github.io/".length);
-        }
-
-        // Also accept an explicit URL on the same GitHub Pages site.
-        if (configPath.startsWith("https://mirrorblogs.github.io/")) {
-          const remote = new URL(configPath);
-          if (remote.pathname.startsWith("/enm/ena/")) {
-            configPath = "/pano-site" + remote.pathname;
-          } else if (remote.pathname.startsWith("/pano-site/")) {
-            configPath = remote.pathname;
+          const remainder = configPath.slice("mirrorblogs.github.io/".length);
+          if (remainder.startsWith("enm/ena/")) {
+            configPath = "/pano-site/" + remainder;
+          } else if (remainder.startsWith("pano-site/")) {
+            configPath = "/" + remainder;
           }
         }
 
-        configURL = new URL(configPath, location.href);
+        // Accept the full canonical URL too.
+        if (configPath.startsWith("https://mirrorblogs.github.io/")) {
+          const remote = new URL(configPath);
+          if (remote.pathname.startsWith("/pano-site/")) {
+            configPath = remote.pathname;
+          } else if (remote.pathname.startsWith("/enm/ena/")) {
+            configPath = "/pano-site" + remote.pathname;
+          }
+        }
 
+        // Convert root-relative paths such as /enm/ena/... to repository paths.
+        if (configPath.startsWith("/enm/ena/")) {
+          configPath = "/pano-site" + configPath;
+        }
+
+        configURL = new URL(configPath, location.href);
         const allowedOrigin = location.origin;
         const allowedPrefix = new URL("/pano-site/", allowedOrigin).pathname;
 
@@ -97,27 +98,20 @@
         }
 
         status.textContent = "Loading panorama...";
-
         const response = await fetch(configURL.href);
-        if (!response.ok) {
-          throw new Error("Config HTTP error: " + response.status);
-        }
+        if (!response.ok) throw new Error("Config HTTP error: " + response.status);
 
         const config = await response.json();
-
         if (videoId) {
           config.title = (config.title || "Panorama") + " — " + videoId;
         }
 
         pannellum.viewer("panorama", config);
-
-        status.textContent = videoId
-          ? "Content ID: " + videoId
-          : "Panorama loaded";
+        status.textContent = videoId ? "Content ID: " + videoId : "Panorama loaded";
       } catch (error) {
         status.textContent = "Error: " + error.message;
         console.error("Pannellum config error:", error, {
-          originalConfig: params.get("config"),
+          suppliedConfig: params.get("config"),
           resolvedURL: configURL && configURL.href
         });
       }
