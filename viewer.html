@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -26,6 +25,8 @@
       background: white;
       color: black;
       font: 14px Arial, sans-serif;
+      max-width: calc(100% - 48px);
+      overflow-wrap: anywhere;
     }
   </style>
 </head>
@@ -38,42 +39,54 @@
   <script>
     (async function () {
       const status = document.getElementById("status");
-
-      // Read the complete query string.
+      const params = new URLSearchParams(location.search);
       const query = location.search;
 
-      // Support the normal format:
-      // ?config=configs/park.json&video=park-360
-      let configPath = new URLSearchParams(query).get("config");
-      let videoId = new URLSearchParams(query).get("video");
+      let configPath = params.get("config");
+      let videoId = params.get("video");
 
-      // Also support the special trailing format:
-      // ?config=configs/park.json?video-park-360
+      // Support: ?config=configs/park.json?video-park-360
       if (query.includes("?video-")) {
         const marker = query.lastIndexOf("?video-");
         videoId = query.slice(marker + 7);
       }
 
-      // Default configuration.
       if (!configPath) {
         configPath = "configs/park.json";
       }
 
-      // This demo only loads JSON files hosted in this repository.
-      // Accept a relative path or this site's absolute URL.
       let configURL;
 
       try {
-        configURL = new URL(
-          decodeURIComponent(configPath),
-          location.href
-        );
+        // URLSearchParams has already decoded percent-encoding once.
+        // Support the special form:
+        // ?config=/%5C%2Fmirrorblogs.github.io%2Fenm%2Fena%2Fpannellum.json
+        // which decodes to: /\/mirrorblogs.github.io/enm/ena/pannellum.json
+        if (configPath.startsWith("/\\/")) {
+          configPath = configPath.slice(3);
+        }
+
+        // Convert the special host/path form to this GitHub Pages site's
+        // actual repository path.
+        if (configPath.startsWith("mirrorblogs.github.io/")) {
+          configPath = "/pano-site/" +
+            configPath.slice("mirrorblogs.github.io/".length);
+        }
+
+        // Also accept an explicit URL on the same GitHub Pages site.
+        if (configPath.startsWith("https://mirrorblogs.github.io/")) {
+          const remote = new URL(configPath);
+          if (remote.pathname.startsWith("/enm/ena/")) {
+            configPath = "/pano-site" + remote.pathname;
+          } else if (remote.pathname.startsWith("/pano-site/")) {
+            configPath = remote.pathname;
+          }
+        }
+
+        configURL = new URL(configPath, location.href);
 
         const allowedOrigin = location.origin;
-        const allowedPrefix = new URL(
-          "/pano-site/",
-          allowedOrigin
-        ).pathname;
+        const allowedPrefix = new URL("/pano-site/", allowedOrigin).pathname;
 
         if (
           configURL.origin !== allowedOrigin ||
@@ -85,18 +98,15 @@
 
         status.textContent = "Loading panorama...";
 
-        const response = await fetch(configURL);
-
+        const response = await fetch(configURL.href);
         if (!response.ok) {
           throw new Error("Config HTTP error: " + response.status);
         }
 
         const config = await response.json();
 
-        // The video ID is a label here, not a video URL.
         if (videoId) {
-          config.title = (config.title || "Panorama") +
-            " — " + videoId;
+          config.title = (config.title || "Panorama") + " — " + videoId;
         }
 
         pannellum.viewer("panorama", config);
@@ -104,10 +114,12 @@
         status.textContent = videoId
           ? "Content ID: " + videoId
           : "Panorama loaded";
-
       } catch (error) {
         status.textContent = "Error: " + error.message;
-        console.error(error);
+        console.error("Pannellum config error:", error, {
+          originalConfig: params.get("config"),
+          resolvedURL: configURL && configURL.href
+        });
       }
     })();
   </script>
