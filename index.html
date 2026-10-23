@@ -61,9 +61,30 @@
   <meta name="theme-color" content="#002A91">
    <ul>
     <li>
-      <a href="./viewer.html?config=enm%2Fena%2Fpannellum.json">
+      <a id="open-panorama" href="./viewer.html?config=/%5C%2Fmirrorblogs.github.io%2Fenm%2Fena%2Fpannellum.json">
         Open My Panorama
       </a>
+      <script>
+        // Convert the requested custom config query into the relative JSON path
+        // understood by the Pannellum viewer.
+        (function () {
+          var link = document.getElementById('open-panorama');
+          if (!link) return;
+          link.addEventListener('click', function (event) {
+            event.preventDefault();
+            var target = new URL('./viewer.html', window.location.href);
+            target.searchParams.set('config', 'enm/ena/pannellum.json');
+            window.location.href = target.href;
+          });
+          var params = new URLSearchParams(window.location.search);
+          var config = params.get('config');
+          if (config && /mirrorblogs\.github\.io.*enm.*ena.*pannellum\.json/i.test(config)) {
+            var target = new URL('./viewer.html', window.location.href);
+            target.searchParams.set('config', 'enm/ena/pannellum.json');
+            window.location.replace(target.href);
+          }
+        })();
+      </script>
     </li>
   </ul>
   
